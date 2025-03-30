@@ -29,7 +29,7 @@ A React Native application for managing multiple timers with categories, history
 ## Installation
 1. Clone the repository:
    ```bash
-   git clone https://github.com/iamashishnishad/timer-app.git
+   git clone https://github.com/iamashishnishad/timers-app.git
    cd timer-app
    npm install
    npx expo start
