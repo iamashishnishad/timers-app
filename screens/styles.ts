@@ -142,4 +142,7 @@ export const createStyles = (theme: 'light' | 'dark') => StyleSheet.create({
   modalButtonText: {
     color: '#fff',
   },
+
 });
+
+

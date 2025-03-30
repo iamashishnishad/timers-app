@@ -26,7 +26,16 @@ const HistoryScreen: React.FC<Props> = ({ navigation }) => {
       try {
         const savedHistory = await AsyncStorage.getItem('history');
         if (savedHistory) {
-          setHistory(JSON.parse(savedHistory));
+          const parsedHistory: HistoryEntry[] = JSON.parse(savedHistory);
+          // Ensure uniqueness by filtering duplicates based on id
+          const uniqueHistory = parsedHistory.reduce((acc, current) => {
+            const x = acc.find((item) => item.id === current.id);
+            if (!x) {
+              return acc.concat([current]);
+            }
+            return acc;
+          }, [] as HistoryEntry[]);
+          setHistory(uniqueHistory);
         }
       } catch (error) {
         console.error('Error loading history:', error);
@@ -37,7 +46,7 @@ const HistoryScreen: React.FC<Props> = ({ navigation }) => {
 
   const renderHistoryItem = ({ item }: { item: HistoryEntry }) => (
     <View style={styles.historyItem}>
-      <Text>
+      <Text style={styles.historyText}>
         {item.name} - Completed: {new Date(item.completionTime).toLocaleString()}
       </Text>
     </View>
@@ -47,12 +56,12 @@ const HistoryScreen: React.FC<Props> = ({ navigation }) => {
     <View style={styles.container}>
       <Text style={styles.title}>Timer History</Text>
       {history.length === 0 ? (
-        <Text>No completed timers yet!</Text>
+        <Text style={styles.emptyText}>No completed timers yet!</Text>
       ) : (
         <FlatList
           data={history}
           renderItem={renderHistoryItem}
-          keyExtractor={(item) => item.id}
+          keyExtractor={(item, index) => `${item.id}-${index}`} // Combine id with index for uniqueness
           style={styles.list}
         />
       )}
@@ -62,13 +71,33 @@ const HistoryScreen: React.FC<Props> = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 20 },
-  title: { fontSize: 20, fontWeight: 'bold', marginBottom: 10 },
-  list: { flex: 1 },
+  container: {
+    flex: 1,
+    padding: 20,
+    backgroundColor: '#fff', // Default light background
+  },
+  title: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 10,
+    color: '#000',
+  },
+  list: {
+    flex: 1,
+  },
   historyItem: {
     padding: 10,
     borderBottomWidth: 1,
     borderColor: '#ccc',
+  },
+  historyText: {
+    color: '#000',
+  },
+  emptyText: {
+    color: '#666',
+    fontSize: 16,
+    textAlign: 'center',
+    marginTop: 20,
   },
 });
 
