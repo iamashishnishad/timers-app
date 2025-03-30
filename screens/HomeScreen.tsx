@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Picker } from '@react-native-picker/picker';
 import { Timer, HistoryEntry } from './types';
 import { createStyles } from './styles';
 import {
@@ -29,11 +30,84 @@ interface Props {
   navigation: HomeScreenNavigationProp;
 }
 
+const TimePickerModal: React.FC<{
+  visible: boolean;
+  onClose: () => void;
+  onConfirm: (seconds: number) => void;
+  theme: 'light' | 'dark';
+}> = ({ visible, onClose, onConfirm, theme }) => {
+  const [minutes, setMinutes] = useState(0);
+  const [seconds, setSeconds] = useState(0);
+  const styles = createStyles(theme);
+
+  const handleConfirm = () => {
+    const totalSeconds = (minutes * 60) + seconds;
+    onConfirm(totalSeconds);
+    setMinutes(0);
+    setSeconds(0);
+    onClose();
+  };
+
+  // Generate arrays for picker items
+  const minuteOptions = Array.from({ length: 60 }, (_, i) => i); // 0-59 minutes
+  const secondOptions = Array.from({ length: 60 }, (_, i) => i); // 0-59 seconds
+
+  return (
+    <Modal visible={visible} transparent animationType="slide">
+      <View style={styles.modalContainer}>
+        <View style={[styles.modalContent, { paddingVertical: 40 }]}>
+          <Text style={styles.modalText}>Select Duration</Text>
+          <View style={{ flexDirection: 'row', justifyContent: 'center' }}>
+            <Picker
+              selectedValue={minutes}
+              onValueChange={(value) => setMinutes(value)}
+              style={{ width: 100, color: theme === 'light' ? '#000' : '#fff' }}
+            >
+              {minuteOptions.map((min) => (
+                <Picker.Item
+                  key={min}
+                  label={`${min.toString().padStart(2, '0')}m`}
+                  value={min}
+                />
+              ))}
+            </Picker>
+            <Text style={[styles.modalText, { marginHorizontal: 10 }]}>:</Text>
+            <Picker
+              selectedValue={seconds}
+              onValueChange={(value) => setSeconds(value)}
+              style={{ width: 100, color: theme === 'light' ? '#000' : '#fff' }}
+            >
+              {secondOptions.map((sec) => (
+                <Picker.Item
+                  key={sec}
+                  label={`${sec.toString().padStart(2, '0')}s`}
+                  value={sec}
+                />
+              ))}
+            </Picker>
+          </View>
+          <View style={{ flexDirection: 'row', marginTop: 20 }}>
+            <TouchableOpacity style={styles.modalButton} onPress={handleConfirm}>
+              <Text style={styles.modalButtonText}>Confirm</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.modalButton, { marginLeft: 10, backgroundColor: '#666' }]}
+              onPress={onClose}
+            >
+              <Text style={styles.modalButtonText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+};
+
 const HomeScreen: React.FC<Props> = ({ navigation }) => {
   const [timers, setTimers] = useState<Timer[]>([]);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [name, setName] = useState<string>('');
-  const [duration, setDuration] = useState<string>('');
+  const [duration, setDuration] = useState<number>(0);
   const [category, setCategory] = useState<string>('');
   const [halfwayAlert, setHalfwayAlert] = useState<boolean>(false);
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
@@ -41,6 +115,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
   const [halfwayTimer, setHalfwayTimer] = useState<Timer | null>(null);
   const [modalVisible, setModalVisible] = useState<boolean>(false);
   const [halfwayModalVisible, setHalfwayModalVisible] = useState<boolean>(false);
+  const [timePickerVisible, setTimePickerVisible] = useState<boolean>(false);
   const [theme, setTheme] = useState<'light' | 'dark'>(
     Appearance.getColorScheme() === 'dark' ? 'dark' : 'light'
   );
@@ -127,15 +202,13 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
   }, [timers, halfwayModalVisible]);
 
   const addTimer = () => {
-    if (!name || !duration || !category) return;
-    const parsedDuration = parseInt(duration);
-    if (isNaN(parsedDuration)) return;
+    if (!name || duration === 0 || !category) return;
 
     const newTimer: Timer = {
       id: Date.now().toString(),
       name,
-      duration: parsedDuration,
-      remaining: parsedDuration,
+      duration,
+      remaining: duration,
       category,
       status: 'Paused',
       halfwayAlert,
@@ -143,7 +216,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
 
     setTimers([...timers, newTimer]);
     setName('');
-    setDuration('');
+    setDuration(0);
     setCategory('');
     setHalfwayAlert(false);
   };
@@ -158,6 +231,12 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
   };
 
   const getProgress = (timer: Timer): number => (timer.remaining / timer.duration) * 100;
+
+  const formatDuration = (seconds: number): string => {
+    const min = Math.floor(seconds / 60);
+    const sec = seconds % 60;
+    return `${min.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
+  };
 
   const groupedTimers = timers
     .filter(timer => !selectedCategoryFilter || timer.category === selectedCategoryFilter)
@@ -184,14 +263,14 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
           onChangeText={setName}
           placeholderTextColor={theme === 'light' ? '#999' : '#ccc'}
         />
-        <TextInput
+        <TouchableOpacity
           style={themedStyles.input}
-          placeholder="Duration (seconds)"
-          value={duration}
-          onChangeText={setDuration}
-          keyboardType="numeric"
-          placeholderTextColor={theme === 'light' ? '#999' : '#ccc'}
-        />
+          onPress={() => setTimePickerVisible(true)}
+        >
+          <Text style={themedStyles.timerText}>
+            {duration === 0 ? 'Set Duration (MM:SS)' : formatDuration(duration)}
+          </Text>
+        </TouchableOpacity>
         <TextInput
           style={themedStyles.input}
           placeholder="Category"
@@ -241,7 +320,9 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
               <View style={themedStyles.timerList}>
                 {categoryTimers.map(timer => (
                   <View key={timer.id} style={themedStyles.timerItem}>
-                    <Text style={themedStyles.timerText}>{timer.name} - {timer.remaining}s - {timer.status}</Text>
+                    <Text style={themedStyles.timerText}>
+                      {timer.name} - {formatDuration(timer.remaining)} - {timer.status}
+                    </Text>
                     <View style={themedStyles.progressContainer}>
                       <View
                         style={[
@@ -308,6 +389,12 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
           </View>
         </View>
       </Modal>
+      <TimePickerModal
+        visible={timePickerVisible}
+        onClose={() => setTimePickerVisible(false)}
+        onConfirm={(seconds) => setDuration(seconds)}
+        theme={theme}
+      />
     </ScrollView>
   );
 };
